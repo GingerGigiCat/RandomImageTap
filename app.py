@@ -19,4 +19,4 @@ def index():
     return flask.render_template("index.html")
 
 
-app.run()
+#app.run()

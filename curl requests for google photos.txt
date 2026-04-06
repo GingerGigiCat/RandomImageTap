@@ -1,0 +1,7 @@
+curl 'https://photos.google.com/_/PhotosUi/data/batchexecute?rpcids=P3pCwd&source-path=%2Fshare%2F{ALBUM_ID}' \
+  --data-raw 'f.req=%5B%5B%5B%22P3pCwd%22%2C%22%5B%5B%5C%22{ALBUM_ID}%5C%22%5D%2C%5C%22{ALBUM_KEY}%5C%22%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&'
+above is to request a link to be generated to download the zip file
+
+curl 'https://photos.google.com/_/PhotosUi/data/batchexecute?rpcids=dnv2s&source-path=%2Fshare%2F{ALBUM_ID}' \
+  --data-raw 'f.req=%5B%5B%5B%22dnv2s%22%2C%22%5B%5B%5C%22{ID_RETURNED_FROM_PREVIOUS_COMMAND}%5C%22%5D%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&'
+above is to actually get a link to the zip file, request intermittently until a link is returned

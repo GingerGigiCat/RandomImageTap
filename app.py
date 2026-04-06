@@ -5,48 +5,95 @@ import selenium
 import time
 import requests
 import io
+import remotezip
+import json
 
 from flask import url_for, send_file
+from remotezip import RemoteZip
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-# TODO: add a cache of images
+# TODO: add a cache of images and find a way to make it vercelable
+
+try:
+    f = open("config.json", "r")
+    json.load(f)
+    f.close()
+except:
+    open("config.json", "w").write(
+        """
+        {
+            "google_photos_album_link": "",
+            "zip_file_link": "",
+            "key": ""
+        }
+        """)
+    print("Fill in the config.json file!")
+
+with open("config.json", "r") as the_file:
+    the_config = json.load(the_file)
+    GOOGLE_PHOTOS_ALBUM_LINK = the_config["google_photos_album_link"]
+    ZIP_FILE_LINK = the_config["zip_file_link"]
+    KEY = the_config["key"]
+
+
 app = flask.Flask(__name__, static_folder="assets")
-driver = webdriver.Chrome()
-images = []
+#driver = webdriver.Chrome()
+remote_zip = RemoteZip(ZIP_FILE_LINK)
+local_images = os.listdir("assets/fetched")
+raw_remote_images = remote_zip.filelist
+remote_images = []
+for image in raw_remote_images:
+    if image.filename[-3:] in ("jpg", "png"):
+        remote_images.append(image.filename)
+print(remote_images)
+
+
+@app.route(f"/getthelatestzipfileplease{KEY}")
+def get_latest_zip():
+    pass
 
 @app.route("/random_image")
 def get_image():
-    #new_image_list = images
+    #new_image_list = local_images
     #image_list = os.listdir("assets")
     #new_image_list = []
     #for image in image_list:
     #    new_image_list.append(f"./assets/{image}")
-    print(images)
-    print(random.choice(images))
-    return send_file(io.BytesIO(requests.get(random.choice(images)).content), mimetype="image") # send_file(random.choice(new_image_list), mimetype="image")
+    big_image_list = local_images + remote_images
+    image = random.choice(big_image_list)
+    if image[image.find("/")+1:] not in local_images:
+        remote_zip.extract(image, f"./assets/fetched")
+        os.rename(f"./assets/fetched/{image}", f"./assets/fetched/{image[image.find("/")+1:]}")
+    return send_file(f"./assets/fetched/{image[image.find("/")+1:]}", mimetype="image")
+
+    return #send_file(io.BytesIO(requests.get(random.choice(local_images)).content), mimetype="image") # send_file(random.choice(new_image_list), mimetype="image")
 
 @app.route("/")
 def index():
     return flask.render_template("index.html")
 
-counter = 0
-driver.get("https://photos.google.com/share/AF1QipOhkv3JKQkgQvaKeVyOhHpj5izKMlu2UExQMP6rw0Y0EmXRwIjK9qhGKKYDDD2iDA?key=dFFSU1h6MEt3YVNDeHNCUUdSamhwRXoxckR0LVNB")
-time.sleep(random.random()*2.13 + 0.92) # Hopefully convince google it's not a bot?
-driver.find_element(By.CLASS_NAME, "p137Zd").click() # Clickable image card
-time.sleep(random.random()*1.4 + 1.2)
-while "RDPZE" not in driver.find_element(By.CLASS_NAME, "Cwtbxf").get_attribute("class") and counter < 10: # RDPZE is the class that gets added to Cwtbxf, the right arrow, when the end of the list has been reached
-    time.sleep(random.random()*0.53 + 0.21)
-    img = driver.find_element(By.CLASS_NAME, "BiCYpc").get_attribute("src") # BiCYpc is the image when big
-    print(img) # Image but big
-    images.append(str(img))
-    ActionChains(driver).send_keys(Keys.ARROW_RIGHT).perform()
-    counter += 1
+"""
+def do_selenium_getting(): # Might not use because vercel can't use selenium
+    counter = 0
+    driver.get(GOOGLE_PHOTOS_ALBUM_LINK)
+    time.sleep(random.random()*2.13 + 0.92) # Hopefully convince google it's not a bot?
+    driver.find_element(By.CLASS_NAME, "p137Zd").click() # Clickable image card
+    time.sleep(random.random()*1.4 + 1.2)
+    while "RDPZE" not in driver.find_element(By.CLASS_NAME, "Cwtbxf").get_attribute("class") and counter < 10: # RDPZE is the class that gets added to Cwtbxf, the right arrow, when the end of the list has been reached
+        time.sleep(random.random()*0.53 + 0.21)
+        img = driver.find_element(By.CLASS_NAME, "BiCYpc").get_attribute("src") # BiCYpc is the image when big
+        print(img) # Image but big
+        local_images.append(str(img))
+        ActionChains(driver).send_keys(Keys.ARROW_RIGHT).perform()
+        counter += 1
+"""
 
 
-#app.run()
+
+app.run()
 
 # regex for image links with w h at the end https:\/\/lh3\.googleusercontent\.com\/pw\/[a-zA-Z0-9-_]+=w[0-9]+-h[0-9]+
 # regex for all image links https:\/\/lh3\.googleusercontent\.com\/pw\/[a-zA-Z0-9-_]+

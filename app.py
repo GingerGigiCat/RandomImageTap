@@ -17,31 +17,6 @@ from selenium.webdriver.common.keys import Keys
 
 # TODO: add a cache of images and find a way to make it vercelable
 
-try:
-    f = open("config.json", "r")
-    json.load(f)
-    f.close()
-except:
-    open("config.json", "w").write(
-        """
-        {
-            "google_photos_album_link": "",
-            "zip_file_link": "",
-            "key": ""
-        }
-        """)
-    print("Fill in the config.json file!")
-
-with open("config.json", "r") as the_file:
-    the_config = json.load(the_file)
-    GOOGLE_PHOTOS_ALBUM_LINK = the_config["google_photos_album_link"]
-    ZIP_FILE_LINK = the_config["zip_file_link"]
-    KEY = the_config["key"]
-
-
-app = flask.Flask(__name__, static_folder="assets")
-#driver = webdriver.Chrome()
-remote_zip = RemoteZip(ZIP_FILE_LINK)
 readonly_fs = False
 try:
     local_images = os.listdir("assets/fetched")
@@ -52,6 +27,44 @@ except FileNotFoundError:
     except OSError:
         readonly_fs = True
         local_images = []
+
+no_config_file = False
+try:
+    f = open("config.json", "r")
+    json.load(f)
+    f.close()
+except:
+    if not readonly_fs:
+        open("config.json", "w").write(
+            """
+{
+    "google_photos_album_link": "",
+    "zip_file_link": "",
+    "key": ""
+}
+            """)
+        print("Fill in the config.json file!")
+    else:
+        no_config_file = True
+
+if not no_config_file:
+    with open("config.json", "r") as the_file:
+        the_config = json.load(the_file)
+        GOOGLE_PHOTOS_ALBUM_LINK = the_config["google_photos_album_link"]
+        ZIP_FILE_LINK = the_config["zip_file_link"]
+        KEY = the_config["key"]
+else:
+    raise FileNotFoundError("""AAAAAA there's MEANT to be a config.json file but there isn't!!!! and i can't create one!!! please make one i beg, contents:
+{
+    "google_photos_album_link": "",
+    "zip_file_link": "",
+    "key": ""
+}
+    """)
+
+app = flask.Flask(__name__, static_folder="assets")
+#driver = webdriver.Chrome()
+remote_zip = RemoteZip(ZIP_FILE_LINK)
 raw_remote_images = remote_zip.filelist
 remote_images = []
 for image in raw_remote_images:

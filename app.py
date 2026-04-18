@@ -16,15 +16,21 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-
+GOOGLE_PHOTOS_ALBUM_LINK = ""
 def album_link_splitter(album_link):
     split_link = re.findall("[a-zA-Z0-9-_]+", album_link)
     return split_link[split_link.index("share")+1], split_link[split_link.index("key")+1]
 
 def zip_file_refresher():
-    album_id, album_key = album_link_splitter()
+    """this is a long-running function"""
+    album_id, album_key = album_link_splitter(GOOGLE_PHOTOS_ALBUM_LINK)
+    print(album_id, album_key)
     link1 = f"https://photos.google.com/_/PhotosUi/data/batchexecute?rpcids=P3pCwd&source-path=%2Fshare%2F{album_id}"
     data1 = f"f.req=%5B%5B%5B%22P3pCwd%22%2C%22%5B%5B%5C%22{album_id}%5C%22%5D%2C%5C%22{album_key}%5C%22%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&"
+    print(requests.post(link1, data1, headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"}).text)
+
+    link2 = f"https://photos.google.com/_/PhotosUi/data/batchexecute?rpcids=dnv2s&source-path=%2Fshare%2F{album_id}"
+    #data2 = f"f.req=%5B%5B%5B%22dnv2s%22%2C%22%5B%5B%5C%22{ID_RETURNED_FROM_PREVIOUS_COMMAND}%5C%22%5D%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&"
 
 readonly_fs = False
 try:
@@ -116,7 +122,7 @@ def do_selenium_getting(): # Might not use because vercel can't use selenium
         counter += 1
 """
 
-
+zip_file_refresher()
 
 #app.run()
 

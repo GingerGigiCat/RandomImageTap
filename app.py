@@ -7,6 +7,7 @@ import requests
 import io
 import remotezip
 import json
+import re
 
 from flask import url_for, send_file
 from remotezip import RemoteZip
@@ -15,7 +16,15 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-# TODO: add a cache of images and find a way to make it vercelable
+
+def album_link_splitter(album_link):
+    split_link = re.findall("[a-zA-Z0-9-_]+", album_link)
+    return split_link[split_link.index("share")+1], split_link[split_link.index("key")+1]
+
+def zip_file_refresher():
+    album_id, album_key = album_link_splitter()
+    link1 = f"https://photos.google.com/_/PhotosUi/data/batchexecute?rpcids=P3pCwd&source-path=%2Fshare%2F{album_id}"
+    data1 = f"f.req=%5B%5B%5B%22P3pCwd%22%2C%22%5B%5B%5C%22{album_id}%5C%22%5D%2C%5C%22{album_key}%5C%22%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&"
 
 readonly_fs = False
 try:
@@ -27,6 +36,7 @@ except FileNotFoundError:
     except OSError:
         readonly_fs = True
         local_images = []
+        raise FileNotFoundError("""AAAAAA i can't create files!! please run me on a file system that isn't read only (ie. not vercel)""")
 
 no_config_file = False
 try:
@@ -34,33 +44,22 @@ try:
     json.load(f)
     f.close()
 except:
-    if not readonly_fs:
         open("config.json", "w").write(
             """
 {
     "google_photos_album_link": "",
-    "zip_file_link": "",
-    "key": ""
+    "passkey": ""
 }
             """)
-        print("Fill in the config.json file!")
-    else:
-        no_config_file = True
+        print("Fill in the config.json file! You only need to add the google photos album link and passkey (which is used to go at the end of the /getthelatestzipfileplease url because it's a long process and i wouldn't want people wasting your resources), i'll figure out some more stuff myself and add it later")
+        exit()
 
-if not no_config_file:
-    with open("config.json", "r") as the_file:
-        the_config = json.load(the_file)
-        GOOGLE_PHOTOS_ALBUM_LINK = the_config["google_photos_album_link"]
-        ZIP_FILE_LINK = the_config["zip_file_link"]
-        KEY = the_config["key"]
-else:
-    raise FileNotFoundError("""AAAAAA there's MEANT to be a config.json file but there isn't!!!! and i can't create one!!! please make one i beg, contents:
-{
-    "google_photos_album_link": "",
-    "zip_file_link": "",
-    "key": ""
-}
-    """)
+with open("config.json", "r") as the_file:
+    the_config = json.load(the_file)
+    GOOGLE_PHOTOS_ALBUM_LINK = the_config["google_photos_album_link"]
+    ZIP_FILE_LINK = the_config["zip_file_link"]
+    PASSKEY = the_config["passkey"] # TODO: ADD ERROR HANDLING AND AND GET THE ZIP FILE LINK
+
 
 app = flask.Flask(__name__, static_folder="assets")
 #driver = webdriver.Chrome()
@@ -73,7 +72,7 @@ for image in raw_remote_images:
 print(remote_images)
 
 
-@app.route(f"/getthelatestzipfileplease{KEY}")
+@app.route(f"/getthelatestzipfileplease{PASSKEY}")
 def get_latest_zip():
     pass
 

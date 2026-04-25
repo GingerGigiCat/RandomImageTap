@@ -65,7 +65,7 @@ def zip_file_refresher():
                 ZIP_FILE_LINK = re.findall(r'https:\/\/storage\.googleapis\.com\/photos-web-downloads-anonymous\/[0-9a-zA-Z-.\/]+', response2_text)[0]
                 the_config["zip_file_link"] = ZIP_FILE_LINK
             with open("config.json", "w") as the_file2:
-                json.dump(the_config, the_file2)
+                json.dump(the_config, the_file2, indent=4)
 
         remote_images =[]
         remote_zip = RemoteZip(ZIP_FILE_LINK)
@@ -82,14 +82,13 @@ def zip_file_refresher():
 
 readonly_fs = False
 try:
-    local_images = os.listdir("assets/fetched")
+    os.listdir("assets/fetched")
 except FileNotFoundError:
     try:
         os.mkdir("assets/fetched")
-        local_images = os.listdir("assets/fetched")
     except OSError:
         readonly_fs = True
-        local_images = []
+        # I had considered doing some nice graceful handling to get it to run on vercel but i'm not using vercel anymore so it doesn't matter so i'm just raising an error
         raise FileNotFoundError("""AAAAAA i can't create files!! please run me on a file system that isn't read only (ie. not vercel)""")
 
 no_config_file = False
@@ -112,7 +111,7 @@ with open("config.json", "r") as the_file:
     the_config = json.load(the_file)
     GOOGLE_PHOTOS_ALBUM_LINK = the_config["google_photos_album_link"]
     ZIP_FILE_LINK = the_config["zip_file_link"]
-    #PASSKEY = the_config["passkey"] # TODO: ADD ERROR HANDLING AND AND GET THE ZIP FILE LINK
+    #PASSKEY = the_config["passkey"]
 
 
 app = flask.Flask(__name__, static_folder="assets")
@@ -138,6 +137,7 @@ def get_image():
     #for image in image_list:
     #    new_image_list.append(f"./assets/{image}")
     try:
+        local_images = os.listdir("assets/fetched")
         big_image_list = local_images + remote_images
         image = random.choice(big_image_list)
         if not readonly_fs:

@@ -1,4 +1,7 @@
 import os
+import threading
+from urllib.error import URLError
+
 import flask
 import random
 import selenium
@@ -10,27 +13,55 @@ import json
 import re
 
 from flask import url_for, send_file
+from pip._internal.utils import datetime
 from remotezip import RemoteZip
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from urllib3.exceptions import ResponseError
 
 GOOGLE_PHOTOS_ALBUM_LINK = ""
+ZIP_FILE_LINK = ""
 def album_link_splitter(album_link):
     split_link = re.findall("[a-zA-Z0-9-_]+", album_link)
     return split_link[split_link.index("share")+1], split_link[split_link.index("key")+1]
 
 def zip_file_refresher():
     """this is a long-running function"""
+    global ZIP_FILE_LINK, GOOGLE_PHOTOS_ALBUM_LINK
     album_id, album_key = album_link_splitter(GOOGLE_PHOTOS_ALBUM_LINK)
-    print(album_id, album_key)
-    link1 = f"https://photos.google.com/_/PhotosUi/data/batchexecute?rpcids=P3pCwd&source-path=%2Fshare%2F{album_id}"
-    data1 = f"f.req=%5B%5B%5B%22P3pCwd%22%2C%22%5B%5B%5C%22{album_id}%5C%22%5D%2C%5C%22{album_key}%5C%22%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&"
-    print(requests.post(link1, data1, headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"}).text)
+    #print(album_id, album_key)
+    try:
+        link1 = f"https://photos.google.com/_/PhotosUi/data/batchexecute?rpcids=P3pCwd&source-path=%2Fshare%2F{album_id}"
+        data1 = f"f.req=%5B%5B%5B%22P3pCwd%22%2C%22%5B%5B%5C%22{album_id}%5C%22%5D%2C%5C%22{album_key}%5C%22%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&"
+        request1 = requests.post(link1, data1, headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"})
+        returned_id = re.findall(r'(?<=\[\["wrb\.fr","P3pCwd","\[\\")[0-9a-f-]+', request1.text)
+        if returned_id:
+            returned_id = returned_id[0]
+        else:
+            raise URLError(f"here's the link I tried to fetch: {link1}\nhere's the data i tried to send: {data1}\nhere's the response: {request1.content()}")
 
-    link2 = f"https://photos.google.com/_/PhotosUi/data/batchexecute?rpcids=dnv2s&source-path=%2Fshare%2F{album_id}"
-    #data2 = f"f.req=%5B%5B%5B%22dnv2s%22%2C%22%5B%5B%5C%22{ID_RETURNED_FROM_PREVIOUS_COMMAND}%5C%22%5D%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&"
+        start_ts = time.time()
+        response2_text = ""
+        while time.time() - start_ts < 15 * 60 and response2_text.find("https://storage.googleapis.com/photos-web-downloads-anonymous/") == -1:
+            time.sleep(5)
+            link2 = f"https://photos.google.com/_/PhotosUi/data/batchexecute?rpcids=dnv2s&source-path=%2Fshare%2F{album_id}"
+            data2 = f"f.req=%5B%5B%5B%22dnv2s%22%2C%22%5B%5B%5C%22{returned_id}%5C%22%5D%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&"
+            request2 = requests.post(link2, data2, headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"})
+            response2_text = request2.text
+
+        if response2_text.find("https://storage.googleapis.com/photos-web-downloads-anonymous/") == -1:
+            raise ResponseError(f"uh google sent stuff that seemed like it was fine but they never actually sent me the link to the zip file, what?\nhere's the id i got{returned_id}\nand here's the previous response: {response2_text}")
+        else:
+            with open("config.json") as the_file:
+                the_config = json.load(the_file)
+                ZIP_FILE_LINK = re.findall(r'https:\/\/storage\.googleapis\.com\/photos-web-downloads-anonymous\/[0-9a-zA-Z-.\/]+', response2_text)[0]
+                the_config["zip_file_link"] = ZIP_FILE_LINK
+                json.dump(the_config, the_file)
+    except Exception as e:
+        print(f"oh no oh dear something went wrong in the zip file refresher, here's the error: {e}")
+
 
 readonly_fs = False
 try:
@@ -64,23 +95,23 @@ with open("config.json", "r") as the_file:
     the_config = json.load(the_file)
     GOOGLE_PHOTOS_ALBUM_LINK = the_config["google_photos_album_link"]
     ZIP_FILE_LINK = the_config["zip_file_link"]
-    PASSKEY = the_config["passkey"] # TODO: ADD ERROR HANDLING AND AND GET THE ZIP FILE LINK
+    #PASSKEY = the_config["passkey"] # TODO: ADD ERROR HANDLING AND AND GET THE ZIP FILE LINK
 
 
 app = flask.Flask(__name__, static_folder="assets")
 #driver = webdriver.Chrome()
-remote_zip = RemoteZip(ZIP_FILE_LINK)
-raw_remote_images = remote_zip.filelist
 remote_images = []
-for image in raw_remote_images:
-    if image.filename[-3:] in ("jpg", "png"):
-        remote_images.append(image.filename)
-print(remote_images)
+try:
+    remote_zip = RemoteZip(ZIP_FILE_LINK)
+    raw_remote_images = remote_zip.filelist
+    for image in raw_remote_images:
+        if image.filename[-3:] in ("jpg", "png"):
+            remote_images.append(image.filename)
+    print(remote_images)
+except remotezip.RemoteIOError:
+    threading.Thread(target=zip_file_refresher).start()
 
 
-@app.route(f"/getthelatestzipfileplease{PASSKEY}")
-def get_latest_zip():
-    pass
 
 @app.route("/random_image")
 def get_image():

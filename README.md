@@ -5,4 +5,4 @@ This is a project for a website of random images from a google photos album, com
 
 This website is deployed to https://tap.gigicat.co.uk, however you can also run it yourself with your own google photos album
 
-To setup, run the `main.py` file. It should quit, and then you can add your google photos album link to the json file it creates. Then run the script again, and it will run the website, giving you a link in the terminal!
+To setup, run `pip3 -r requirements.txt`, then the `app.py` file. It should quit, and then you can add your google photos album link to the json file it creates. Then run `app.py` again, and it will run the website, giving you a link in the terminal!

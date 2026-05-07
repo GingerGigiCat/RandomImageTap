@@ -101,7 +101,8 @@ except:
             """
 {
     "google_photos_album_link": "",
-    "passkey": ""
+    "passkey": "",
+    "zip_file_link": ""
 }
             """)
         print("Fill in the config.json file! You only need to add the google photos album link and passkey (which is used to go at the end of the /getthelatestzipfileplease url because it's a long process and i wouldn't want people wasting your resources), i'll figure out some more stuff myself and add it later")
@@ -137,26 +138,36 @@ def get_image():
     #for image in image_list:
     #    new_image_list.append(f"./assets/{image}")
     try:
-        local_images = os.listdir("assets/fetched")
+        local_images_maycontainfolders = os.scandir("assets/fetched")
+        local_images = []
+        for i in local_images_maycontainfolders:
+            if i.is_file():
+                local_images.append(i.name)
         big_image_list = local_images + remote_images
         image = random.choice(big_image_list)
         if not readonly_fs:
             if image[image.find("/")+1:] not in local_images:
+                print("non-local")
                 try:
                     remote_zip.extract(image, f"./assets/fetched")
                     os.rename(f"./assets/fetched/{image}", f"./assets/fetched/{image[image.find("/")+1:]}")
-                except:
+                except Exception as e:
+                    print(1, e)
                     image = random.choice(local_images)
-                    threading.Thread(target=zip_file_refresher).start()
+                    if e is remotezip.RemoteIOError:
+                        threading.Thread(target=zip_file_refresher).start()
             return send_file(f"./assets/fetched/{image[image.find("/")+1:]}", mimetype="image")
         else:
             try:
                 image_data = remote_zip.read(image)
                 return send_file(io.BytesIO(image_data), mimetype="image")
-            except:
-                threading.Thread(target=zip_file_refresher).start()
+            except Exception as e:
+                print(2, e)
+                if e is remotezip.RemoteIOError:
+                    threading.Thread(target=zip_file_refresher).start()
                 return send_file(image, mimetype="image")
-    except:
+    except Exception as e:
+        print(3, e)
         threading.Thread(target=zip_file_refresher).start()
         return send_file("./assets/fallback.png", "image")
 
